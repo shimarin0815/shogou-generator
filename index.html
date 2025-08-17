@@ -1,1 +1,276 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>しょうもない称号ジェネレーター</title>
+  <meta name="description" content="名前を入れるだけで『世界一くだらない◯◯マスター』みたいな称号を自動生成！ワンクリックでXにシェアできます。" />
+  <!-- Tailwind (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- html2canvas for image download -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <!-- Emoji / Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --grad-from:#fda4af; /* pink-300 */
+      --grad-to:#fde68a;   /* amber-200 */
+      --card-accent:#0ea5e9; /* sky-500 */
+    }
+    .font-main{font-family:"Zen Kaku Gothic New","Noto Sans JP",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";}
+    .shine{position:relative;overflow:hidden}
+    .shine:after{content:"";position:absolute;inset:-100% -50%;background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,.35),transparent 70%);transform:translateX(-100%);}
+    .shine:hover:after{animation:shine 1.2s forwards}
+    @keyframes shine{to{transform:translateX(100%)}}
+  </style>
+</head>
+<body class="font-main min-h-screen bg-gradient-to-br from-[var(--grad-from)] to-[var(--grad-to)] flex items-center justify-center p-6">
+  <main class="w-full max-w-2xl">
+    <section class="text-center mb-6">
+      <h1 class="text-3xl md:text-4xl font-extrabold drop-shadow-sm">しょうもない称号ジェネレーター 🏆</h1>
+      <p class="mt-2 text-slate-800/80">名前を入れて、世界にひとつの“くだらない称号”を作ろう！</p>
+    </section>
+
+    <section class="bg-white/80 backdrop-blur rounded-3xl shadow-xl p-5 md:p-6">
+      <div class="flex flex-col md:flex-row gap-3 md:gap-4 items-stretch">
+        <input id="nameInput" type="text" inputmode="kana-name" placeholder="例：しまりん / Shimarin"
+               class="flex-1 rounded-2xl border border-slate-300 px-4 py-3 text-lg focus:ring-2 focus:ring-sky-400 focus:outline-none">
+        <button id="genBtn" class="shine rounded-2xl px-5 py-3 text-white font-bold text-lg bg-sky-500 hover:bg-sky-600 active:scale-[.99] transition">称号を生成！</button>
+      </div>
+
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button id="shuffleTheme" class="rounded-xl px-3 py-2 text-sm bg-slate-900 text-white/95 hover:bg-slate-800">テーマをシャッフル</button>
+        <button id="randomName" class="rounded-xl px-3 py-2 text-sm bg-slate-200 hover:bg-slate-300">サンプルで試す</button>
+      </div>
+
+      <!-- Result Card -->
+      <div id="resultWrap" class="mt-6 hidden">
+        <div id="card" class="mx-auto w-full max-w-xl rounded-3xl shadow-2xl bg-white p-6 md:p-8 text-center border-4" style="border-color: var(--card-accent);">
+          <div class="text-xs uppercase tracking-widest text-slate-500">本日の称号</div>
+          <h2 id="titleText" class="mt-2 text-2xl md:text-3xl font-black leading-tight">
+            世界一くだらない◯◯マスター
+          </h2>
+          <div class="mt-3 text-slate-600">提供：しょうもない称号ジェネレーター</div>
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <a id="xShare" target="_blank" rel="noopener" class="shine flex items-center justify-center gap-2 rounded-2xl bg-black text-white py-3 font-bold hover:opacity-90">
+            <span>𝕏 でシェア</span>
+          </a>
+          <button id="copyText" class="rounded-2xl bg-white border border-slate-300 py-3 font-bold hover:bg-slate-50">テキストをコピー</button>
+          <button id="dlImage" class="rounded-2xl bg-white border border-slate-300 py-3 font-bold hover:bg-slate-50">カード画像を保存</button>
+        </div>
+
+        <details class="mt-4 bg-slate-50 rounded-2xl p-4">
+          <summary class="cursor-pointer font-bold">おすすめ投稿例 & ハッシュタグ</summary>
+          <div class="mt-3 text-sm leading-relaxed" id="captionBox"></div>
+        </details>
+      </div>
+    </section>
+
+    <footer class="text-center mt-6 text-xs text-slate-800/70">
+      © 2025 しょうもない称号ジェネレーター — made for fun
+    </footer>
+  </main>
+
+<script>
+// ====== Utility ======
+const $ = (s)=>document.querySelector(s);
+const rand = (arr)=>arr[Math.floor(Math.random()*arr.length)];
+function hashCode(str){let h=0;for(let i=0;i<str.length;i++){h=((h<<5)-h)+str.charCodeAt(i);h|=0}return Math.abs(h)}
+
+// ====== Data ======
+const patterns = [
+  "世界一くだらない{n}マスター",
+  "冷蔵庫の{n}チャンピオン",
+  "永遠の{n}番長",
+  "伝説の{n}クラッシャー",
+  "寝起きの{n}仙人",
+  "コンビニの{n}勇者",
+  "人類最後の{n}ハンター",
+  "自称{n}博士",
+  "三日坊主の{n}王",
+  "歩く{n}図鑑",
+  "非公認{n}アンバサダー",
+  "究極の{n}ソムリエ",
+  "社会にやさしい{n}破壊神",
+  "今日だけの{n}総監督",
+  "真夜中の{n}評論家",
+  "令和の{n}魔術師",
+];
+
+const sampleNames = ["しまりん","たなか","ネコ","キャベツ","謎の生命体","Shimarin","Taro","Yamada"];
+
+const captionTemplates = [
+  "今日の称号：『{title}』\n当たってる？ #しょうもない称号ジェネレーター",
+  "診断結果：{title} — 反論は受け付けます #しょうもない称号 #ネタアプリ",
+  "たぶん公式より信用できない称号→ {title} #遊んでみた",
+  "店内アナウンス：{title} 様、おめでとうございます（？） #しょうもない称号",
+];
+
+const hashtagCandidates = [
+  "#しょうもない称号ジェネレーター",
+  "#しょうもない称号",
+  "#ネタアプリ",
+  "#診断メーカー風",
+  "#暇つぶし",
+];
+
+// ====== Theme Shuffle ======
+const themes = [
+  {from:'#fda4af', to:'#fde68a', accent:'#0ea5e9'}, // pink->amber
+  {from:'#93c5fd', to:'#a7f3d0', accent:'#8b5cf6'}, // blue->mint, violet accent
+  {from:'#fbcfe8', to:'#cffafe', accent:'#f59e0b'}, // pink->cyan, amber accent
+  {from:'#c4b5fd', to:'#f5d0fe', accent:'#10b981'}, // violet->pink, emerald accent
+  {from:'#fecaca', to:'#fef08a', accent:'#ef4444'}, // rose->yellow, red accent
+];
+function applyTheme(theme){
+  document.documentElement.style.setProperty('--grad-from', theme.from);
+  document.documentElement.style.setProperty('--grad-to', theme.to);
+  document.documentElement.style.setProperty('--card-accent', theme.accent);
+}
+
+// ====== Title Generation ======
+function makeTitle(name){
+  if(!name) return '';
+  // ensure some determinism so same名前でも似た雰囲気に
+  const h = hashCode(name);
+  const pattern = patterns[h % patterns.length];
+  // かな・カナ・英字混在OK
+  const n = name.trim();
+  return pattern.replaceAll('{n}', n);
+}
+
+function buildTweetUrl(text){
+  const params = new URLSearchParams({ text });
+  // NOTE: URLは省略（ホスティングURLが決まったら &url= を追加）
+  return `https://twitter.com/intent/tweet?${params.toString()}`;
+}
+
+function updateCaptionSuggestions(title){
+  const box = $('#captionBox');
+  const list = captionTemplates.map(t=>`• ${t.replace('{title}', title)}`).join('<br/>');
+  const tags = hashtagCandidates.join(' ');
+  box.innerHTML = `${list}<br/><br/><b>推しハッシュタグ：</b><br/>${tags}`;
+}
+
+// ====== Image Download ======
+async function downloadCardImage(){
+  const node = document.getElementById('card');
+  const canvas = await html2canvas(node, {backgroundColor:null, scale:2});
+  canvas.toBlob((blob)=>{
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'shogou-card.png';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+}
+
+// ====== URL Params (shareable) ======
+function canReplaceState(){
+  // Avoid SecurityError in sandboxed/unsupported schemes (about:, data:, blob:)
+  try {
+    const proto = location.protocol; // e.g. 'https:' or 'about:'
+    if (!('replaceState' in history)) return false;
+    if (proto === 'about:' || proto === 'data:' || proto === 'blob:') return false;
+    return true;
+  } catch { return false; }
+}
+
+function readParams(){
+  try {
+    const url = new URL(location.href);
+    const name = url.searchParams.get('name') || sessionStorage.getItem('lastName') || '';
+    return {name};
+  } catch {
+    // Fallback if URL API not available
+    const name = sessionStorage.getItem('lastName') || '';
+    return {name};
+  }
+}
+
+function writeParams(name){
+  // Update the query string if permitted; otherwise no-op (store to sessionStorage as a soft fallback)
+  try {
+    const url = new URL(location.href);
+    url.searchParams.set('name', name);
+    if (canReplaceState()) {
+      history.replaceState(null, '', url.toString());
+    } else {
+      try { sessionStorage.setItem('lastName', name); } catch {}
+    }
+  } catch {
+    try { sessionStorage.setItem('lastName', name); } catch {}
+  }
+}
+
+// ====== Events ======
+function generate(){
+  const name = $('#nameInput').value.trim();
+  if(!name){alert('名前を入力してね！');return}
+  const title = makeTitle(name);
+  $('#titleText').textContent = title;
+  $('#resultWrap').classList.remove('hidden');
+  const tweetText = `${title}  #しょうもない称号ジェネレーター`;
+  $('#xShare').setAttribute('href', buildTweetUrl(tweetText));
+  updateCaptionSuggestions(title);
+  writeParams(name);
+}
+
+$('#genBtn').addEventListener('click', generate);
+$('#nameInput').addEventListener('keydown', e=>{ if(e.key==='Enter') generate(); });
+$('#randomName').addEventListener('click', ()=>{ $('#nameInput').value = rand(sampleNames); generate(); });
+$('#shuffleTheme').addEventListener('click', ()=>{ applyTheme(rand(themes)); });
+$('#copyText').addEventListener('click', ()=>{
+  const t = $('#titleText').textContent;
+  navigator.clipboard.writeText(`${t} #しょうもない称号ジェネレーター`).then(()=>{
+    $('#copyText').textContent='コピーしました！';
+    setTimeout(()=>$('#copyText').textContent='テキストをコピー',1200);
+  });
+});
+$('#dlImage').addEventListener('click', downloadCardImage);
+
+// ====== Init ======
+applyTheme(themes[0]);
+const init = readParams();
+if(init.name){
+  $('#nameInput').value = init.name;
+  generate();
+}
+
+// ====== Self Tests (non-intrusive; console only) ======
+(function selfTests(){
+  console.group('%cSelf-tests','color:#10b981;font-weight:bold');
+  try {
+    // 1) hashCode determinism
+    console.assert(hashCode('ABC')===hashCode('ABC'), 'hashCode should be deterministic');
+    console.assert(hashCode('ABC')!==hashCode('ABD'), 'hashCode should vary with input');
+
+    // 2) makeTitle behavior
+    const t1 = makeTitle('しまりん');
+    const t2 = makeTitle('しまりん');
+    console.assert(t1 && t1===t2, 'makeTitle should be deterministic for same name');
+    console.assert(!makeTitle(''), 'makeTitle("") should return empty string');
+
+    // 3) URL handling should not throw in sandbox
+    const before = location.search;
+    writeParams('テスト'); // should not throw regardless of environment
+    const can = (location.protocol!=='about:' && location.protocol!=='data:' && location.protocol!=='blob:');
+    console.assert(canReplaceState()===can, 'canReplaceState should reflect protocol support');
+
+    // 4) readParams should return something (string)
+    const rp = readParams();
+    console.assert(typeof rp.name==='string', 'readParams.name should be a string');
+  } catch (e) {
+    console.error('Self-tests error:', e);
+  }
+  console.groupEnd();
+})();
+</script>
+</body>
+</html>
+
 
